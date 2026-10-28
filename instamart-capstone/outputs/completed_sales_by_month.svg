@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="318" viewBox="0 0 920 318">
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<text x="24" y="34" font-size="22" font-family="Arial" font-weight="bold" fill="#0f172a">Completed order value by month</text>
+<text x="24" y="81" font-size="14" font-family="Arial" fill="#334155">2025-04</text>
+<rect x="210" y="62" width="570.0" height="24" rx="4" fill="#2563eb"/>
+<text x="789.0" y="80" font-size="13" font-family="Arial" fill="#0f172a">527,475 INR</text>
+<text x="24" y="119" font-size="14" font-family="Arial" fill="#334155">2025-05</text>
+<rect x="210" y="100" width="523.6" height="24" rx="4" fill="#2563eb"/>
+<text x="742.6" y="118" font-size="13" font-family="Arial" fill="#0f172a">484,562 INR</text>
+<text x="24" y="157" font-size="14" font-family="Arial" fill="#334155">2025-06</text>
+<rect x="210" y="138" width="568.4" height="24" rx="4" fill="#2563eb"/>
+<text x="787.4" y="156" font-size="13" font-family="Arial" fill="#0f172a">526,014 INR</text>
+<text x="24" y="195" font-size="14" font-family="Arial" fill="#334155">2025-07</text>
+<rect x="210" y="176" width="534.5" height="24" rx="4" fill="#2563eb"/>
+<text x="753.5" y="194" font-size="13" font-family="Arial" fill="#0f172a">494,656 INR</text>
+<text x="24" y="233" font-size="14" font-family="Arial" fill="#334155">2025-08</text>
+<rect x="210" y="214" width="529.6" height="24" rx="4" fill="#2563eb"/>
+<text x="748.6" y="232" font-size="13" font-family="Arial" fill="#0f172a">490,074 INR</text>
+<text x="24" y="271" font-size="14" font-family="Arial" fill="#334155">2025-09</text>
+<rect x="210" y="252" width="481.8" height="24" rx="4" fill="#2563eb"/>
+<text x="700.8" y="270" font-size="13" font-family="Arial" fill="#0f172a">445,841 INR</text>
+</svg>

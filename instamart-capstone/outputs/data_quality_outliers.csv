@@ -1,0 +1,5 @@
+table,column,non_null_count,q1,q3,iqr_lower_bound,iqr_upper_bound,outlier_count,cleaning_action
+customers,age,1200,29.0,50.0,-2.5,81.5,5,Flagged for review; retained unless invalid by business rule
+orders,quantity,12197,1.0,3.0,-2.0,6.0,0,Flagged for review; retained unless invalid by business rule
+orders,order_amount,12197,63.75,296.65,-285.6,646.0,983,Flagged for review; retained unless invalid by business rule
+orders,delivery_minutes,10336,19.0,31.0,1.0,49.0,959,Flagged for review; retained unless invalid by business rule

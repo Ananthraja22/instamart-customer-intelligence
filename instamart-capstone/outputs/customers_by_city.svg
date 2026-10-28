@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="318" viewBox="0 0 920 318">
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<text x="24" y="34" font-size="22" font-family="Arial" font-weight="bold" fill="#0f172a">Customers by standardized city</text>
+<text x="24" y="81" font-size="14" font-family="Arial" fill="#334155">Pune</text>
+<rect x="210" y="62" width="570.0" height="24" rx="4" fill="#2563eb"/>
+<text x="789.0" y="80" font-size="13" font-family="Arial" fill="#0f172a">227 customers</text>
+<text x="24" y="119" font-size="14" font-family="Arial" fill="#334155">Delhi</text>
+<rect x="210" y="100" width="527.3" height="24" rx="4" fill="#2563eb"/>
+<text x="746.3" y="118" font-size="13" font-family="Arial" fill="#0f172a">210 customers</text>
+<text x="24" y="157" font-size="14" font-family="Arial" fill="#334155">Bengaluru</text>
+<rect x="210" y="138" width="494.7" height="24" rx="4" fill="#2563eb"/>
+<text x="713.7" y="156" font-size="13" font-family="Arial" fill="#0f172a">197 customers</text>
+<text x="24" y="195" font-size="14" font-family="Arial" fill="#334155">Chennai</text>
+<rect x="210" y="176" width="479.6" height="24" rx="4" fill="#2563eb"/>
+<text x="698.6" y="194" font-size="13" font-family="Arial" fill="#0f172a">191 customers</text>
+<text x="24" y="233" font-size="14" font-family="Arial" fill="#334155">Hyderabad</text>
+<rect x="210" y="214" width="479.6" height="24" rx="4" fill="#2563eb"/>
+<text x="698.6" y="232" font-size="13" font-family="Arial" fill="#0f172a">191 customers</text>
+<text x="24" y="271" font-size="14" font-family="Arial" fill="#334155">Mumbai</text>
+<rect x="210" y="252" width="462.0" height="24" rx="4" fill="#2563eb"/>
+<text x="681.0" y="270" font-size="13" font-family="Arial" fill="#0f172a">184 customers</text>
+</svg>

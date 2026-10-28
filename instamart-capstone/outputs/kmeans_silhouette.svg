@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="420" viewBox="0 0 760 420">
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<text x="72" y="32" font-family="Arial" font-size="20" font-weight="bold" fill="#0f172a">K-Means silhouette score by K</text>
+<line x1="72" y1="60" x2="72" y2="362" stroke="#64748b"/>
+<line x1="72" y1="362" x2="736" y2="362" stroke="#64748b"/>
+<circle cx="72.0" cy="181.2" r="6" fill="#2563eb"/>
+<text x="60.0" y="386" font-family="Arial" font-size="13" fill="#334155">2</text>
+<text x="53.0" y="170.2" font-family="Arial" font-size="11" fill="#0f172a">0.465</text>
+<circle cx="182.7" cy="225.3" r="6" fill="#2563eb"/>
+<text x="170.7" y="386" font-family="Arial" font-size="13" fill="#334155">3</text>
+<text x="163.7" y="214.3" font-family="Arial" font-size="11" fill="#0f172a">0.444</text>
+<circle cx="293.3" cy="60.0" r="6" fill="#2563eb"/>
+<text x="281.3" y="386" font-family="Arial" font-size="13" fill="#334155">4</text>
+<text x="274.3" y="49.0" font-family="Arial" font-size="11" fill="#0f172a">0.524</text>
+<circle cx="404.0" cy="159.1" r="6" fill="#2563eb"/>
+<text x="392.0" y="386" font-family="Arial" font-size="13" fill="#334155">5</text>
+<text x="385.0" y="148.1" font-family="Arial" font-size="11" fill="#0f172a">0.476</text>
+<circle cx="514.7" cy="147.1" r="6" fill="#2563eb"/>
+<text x="502.7" y="386" font-family="Arial" font-size="13" fill="#334155">6</text>
+<text x="495.7" y="136.1" font-family="Arial" font-size="11" fill="#0f172a">0.482</text>
+<circle cx="625.3" cy="281.5" r="6" fill="#2563eb"/>
+<text x="613.3" y="386" font-family="Arial" font-size="13" fill="#334155">7</text>
+<text x="606.3" y="270.5" font-family="Arial" font-size="11" fill="#0f172a">0.417</text>
+<circle cx="736.0" cy="362.0" r="6" fill="#2563eb"/>
+<text x="724.0" y="386" font-family="Arial" font-size="13" fill="#334155">8</text>
+<text x="717.0" y="351.0" font-family="Arial" font-size="11" fill="#0f172a">0.378</text>
+<text x="404.0" y="408" font-family="Arial" font-size="13" fill="#334155" text-anchor="middle">K</text>
+</svg>
