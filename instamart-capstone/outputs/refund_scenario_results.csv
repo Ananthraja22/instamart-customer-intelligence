@@ -1,8 +1,0 @@
-scenario_id,customer_id,actual_outcome,expected_outcome,outcome_match,refund_inr,expected_refund_inr,reason
-S1,C0007,REFUND,REFUND,True,128.25,128.25,Completed order was delivered after 45 minutes; within auto-approval limit.
-S2,C0008,REFUND,REFUND,True,135.0,135.0,Completed order was delivered after 45 minutes; within auto-approval limit.
-S3,C0016,ESCALATE,ESCALATE,True,1999.0,1999.0,Refund exceeds INR 1000 and requires human support lead approval.
-S4,C0001,DENIED,DENIED,True,0.0,0.0,Completed delivery was not more than 45 minutes.
-S5,C0003,DENIED,DENIED,True,0.0,0.0,Policy allows refunds only for completed orders.
-S6,C0001,NOT_FOUND,NOT_FOUND,True,0.0,0.0,Order was not found for this customer.
-S7,C0007,FALLBACK,FALLBACK,True,0.0,0.0,Loop guard triggered; hand off to a human agent.
