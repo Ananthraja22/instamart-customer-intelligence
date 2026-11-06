@@ -1,9 +1,10 @@
-"""Part C: support-ticket triage around mock_llm.py with guardrails, retries, validation, budget, routing.
+"""Part C: support-ticket triage around mock_llm.py with guardrails, retries, validation, budget and routing.
 
 Pipeline for each ticket, in file order:
-    input guardrails -> PII redaction -> model call with retry -> output validation -> routing
+    input guardrails -> token budget check -> PII redaction -> model call with retry -> output validation -> routing
 
-The model only ever receives the redacted ticket text. Output files hold no ticket text at all.
+The model only ever receives the redacted ticket text, and an assertion checks every prompt before it is sent.
+Output files hold no ticket text at all.
 """
 import json
 import random
@@ -20,10 +21,14 @@ from mock_llm import TransientLLMError, chat, est_tokens
 MAX_INPUT_TOKENS = 400
 MAX_RETRIES = 3
 BASE_DELAY = 0.05
+DEMO_TOKEN_BUDGET = 6000
+FINAL_TOKEN_BUDGET = 100000
 ALLOWED = ("billing", "delivery", "technical", "fraud")
+CLASSIFIED = ("classified_json", "classified_keyword")
 REDACTIONS = (("email", re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+"), "[EMAIL]"),
               ("phone", re.compile(r"\b[6-9]\d{9}\b"), "[PHONE]"),
               ("order_id", re.compile(r"ORD-\d{6}"), "[ORDER_ID]"))
+RESULT_COLUMNS = ["ticket_id", "customer_id", "status", "category", "segment_name", "priority", "route", "tokens_used"]
 
 ZERO_SHOT = """You are the support desk triage assistant for a grocery delivery app.
 CLASSIFY the customer ticket into exactly one of these categories: billing, delivery, technical, fraud.
@@ -47,6 +52,11 @@ def redact(text):
     for name, pattern, placeholder in REDACTIONS:
         text, counts[name] = pattern.subn(placeholder, text)
     return text, counts
+
+
+def assert_no_pii(text, where):
+    for name, pattern, _ in REDACTIONS:
+        assert not pattern.search(text), f"{name} found in {where}"
 
 
 def input_guard(text):
@@ -73,8 +83,9 @@ def validate(reply):
     return "flagged_invalid_output", ""
 
 
-def call_with_retry(ticket_id, messages, jitter):
-    """Exponential backoff with jitter. Returns (response, number_of_transient_errors)."""
+def call_with_retry(ticket_id, messages, waits):
+    """Exponential backoff with jitter. Returns (response, number_of_transient_errors).
+    Raises TransientLLMError once the retries are used up."""
     errors = 0
     for retry in range(MAX_RETRIES + 1):
         try:
@@ -83,48 +94,52 @@ def call_with_retry(ticket_id, messages, jitter):
             errors += 1
             if retry == MAX_RETRIES:
                 raise
-            wait = BASE_DELAY * 2 ** retry * jitter.uniform(0.9, 1.15)
-            print(f"[retry] ticket={ticket_id} retry={retry} wait={wait:.3f}s")
+            wait = BASE_DELAY * 2 ** retry * random.uniform(0.9, 1.15)
+            waits.append((retry, wait))
+            print(f"[retry] ticket={ticket_id} retry={retry} wait={wait:.4f}s")
             time.sleep(wait)
 
 
 def run_pipeline(tickets, system_prompt, token_budget=None):
-    """One full run. With a budget, a call that could overrun it is not made and the ticket is deferred."""
+    """One full run. Returns (one row per ticket, the retry waits)."""
     mock_llm.reset()
-    jitter = random.Random(42)
+    random.seed(42)
     used = 0
+    waits = []
     rows = []
     for t in tickets.itertuples(index=False):
         row = {"ticket_id": t.ticket_id, "customer_id": t.customer_id, "true_category": t.true_category,
-               "status": "", "category": "", "tokens": 0, "transient_errors": 0, "cumulative_tokens": used}
+               "status": "", "category": "", "tokens_used": 0, "transient_errors": 0, "cumulative_tokens": used}
+        rows.append(row)
         blocked = input_guard(t.text)
         if blocked:
             row["status"] = blocked
-            rows.append(row)
+            continue
+        if token_budget is not None and used >= token_budget:
+            row["status"] = "budget_exhausted"
             continue
         safe_text, _ = redact(t.text)
         messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": safe_text}]
-        if token_budget is not None:
-            # Prompt size is known up front; reserve the largest reply the validator can accept.
-            needed = est_tokens(system_prompt) + est_tokens(safe_text) + est_tokens('{"category": "technical", "reason": "keyword match"}')
-            if used + needed > token_budget:
-                row["status"] = "deferred_budget"
-                rows.append(row)
-                continue
-        response, errors = call_with_retry(t.ticket_id, messages, jitter)
+        for m in messages:
+            assert_no_pii(m["content"], f"the prompt for {t.ticket_id}")
+        try:
+            response, errors = call_with_retry(t.ticket_id, messages, waits)
+        except TransientLLMError:  # One unreachable ticket goes to a human; the rest of the batch still runs.
+            row["status"] = "failed_model_error"
+            row["transient_errors"] = MAX_RETRIES + 1
+            continue
         row["status"], row["category"] = validate(response.choices[0].message.content)
-        row["tokens"] = response.usage.total_tokens
+        row["tokens_used"] = response.usage.total_tokens
         row["transient_errors"] = errors
         used += response.usage.total_tokens
         row["cumulative_tokens"] = used
-        rows.append(row)
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows), waits
 
 
 def summarise(result, label):
-    classified = result[result["status"].isin(["classified_json", "classified_keyword"])]
+    classified = result[result["status"].isin(CLASSIFIED)]
     correct = int((classified["category"] == classified["true_category"]).sum())
-    total_tokens = int(result["tokens"].sum())
+    total_tokens = int(result["tokens_used"].sum())
     return {"prompt": label, "classified": len(classified),
             "classified_json": int((result["status"] == "classified_json").sum()),
             "classified_keyword": int((result["status"] == "classified_keyword").sum()),
@@ -135,32 +150,23 @@ def summarise(result, label):
 
 
 def route(result):
-    """Apply the escalation policy using the Part B segments. Tightest deadline wins when two rules apply."""
+    """The brief's routing. Any ticket without a proven category goes to a human."""
     segments = pd.read_csv(f"{OUTPUTS}/customer_segments.csv")[["customer_id", "segment_name", "is_premium"]]
     routed = result.merge(segments, on="customer_id", how="left", validate="many_to_one")
-    routed["segment_name"] = routed["segment_name"].fillna("No completed orders")
-    routed["is_premium"] = routed["is_premium"].fillna(False).astype(bool)
+    routed["segment_name"] = routed["segment_name"].fillna("")
+    routed["is_premium"] = routed["is_premium"].fillna(False).astype(bool)  # No segment row means not premium.
 
     def decide(r):
-        base_sla = 1 if r.is_premium else 24
-        if r.status == "skipped_empty":
-            return "ask_customer_for_details", "low", base_sla
-        if r.status in ("flagged_long", "flagged_invalid_output", "deferred_budget"):
-            return "human_review", "high" if r.is_premium else "normal", base_sla
+        if r.status not in CLASSIFIED:
+            return "human_review", "NORMAL"
         if r.category == "fraud":
-            return "security_team", "high", min(2, base_sla)
-        return f"{r.category}_team", "high" if r.is_premium else "normal", base_sla
+            return "security_team", "HIGH"
+        if r.is_premium:
+            return "premium_desk", "HIGH"
+        return "support_queue", "NORMAL"
 
-    decisions = [decide(r) for r in routed.itertuples(index=False)]
-    routed["queue"], routed["priority"], routed["sla_hours"] = zip(*decisions)
+    routed["route"], routed["priority"] = zip(*[decide(r) for r in routed.itertuples(index=False)])
     return routed
-
-
-def assert_no_pii(frame):
-    """No output file may contain anything the redaction patterns would catch."""
-    blob = frame.to_csv(index=False)
-    for name, pattern, _ in REDACTIONS:
-        assert not pattern.search(blob), f"{name} found in an output file"
 
 
 def main():
@@ -193,9 +199,15 @@ def main():
     assert "EXAMPLES:" not in ZERO_SHOT and "\nEXAMPLES:\n" in FEW_SHOT
 
     section("Tasks 4-5: zero-shot run (one retry line per transient error)")
-    zero = run_pipeline(tickets, ZERO_SHOT)
+    zero, zero_waits = run_pipeline(tickets, ZERO_SHOT)
     section("Tasks 4-5: few-shot run (one retry line per transient error)")
-    few = run_pipeline(tickets, FEW_SHOT)
+    few, few_waits = run_pipeline(tickets, FEW_SHOT)
+
+    section("Retry waits")
+    waits = zero_waits + few_waits
+    assert all(r == 0 and 0.045 <= w <= 0.0575 for r, w in waits)
+    print(f"{len(waits)} waits over the two runs, all retry number 0; "
+          f"lowest {min(w for _, w in waits):.4f}s, highest {max(w for _, w in waits):.4f}s (allowed 0.0450 to 0.0575)")
 
     section("Task 6: zero-shot versus few-shot")
     summary = pd.DataFrame([summarise(zero, "zero-shot"), summarise(few, "few-shot")])
@@ -203,38 +215,39 @@ def main():
     for s in summary.itertuples(index=False):
         assert (s.classified_json, s.classified_keyword, s.flagged_invalid_output) == (135, 12, 9), s
         assert s.transient_errors == 19, s
+    assert summary["correct"].tolist() == [126, 147], "reference accuracies are 126 of 147 and 147 of 147"
+    no_call = zero["status"].isin(["skipped_empty", "flagged_long"])
+    assert zero.loc[no_call, "tokens_used"].sum() == 0 and int(no_call.sum()) == 8
 
     for label, frame in [("zero-shot", zero), ("few-shot", few)]:
-        classified = frame[frame["status"].isin(["classified_json", "classified_keyword"])]
+        classified = frame[frame["status"].isin(CLASSIFIED)]
         table = pd.crosstab(classified["true_category"], classified["category"]).reindex(
             index=list(ALLOWED), columns=list(ALLOWED), fill_value=0)
         section(f"Confusion table, {label} (rows: true; columns: predicted)")
         print(md_table(table.rename_axis(None, axis=1).reset_index().rename(columns={"true_category": "true"})))
 
-    section("Routing the few-shot run (the more accurate prompt)")
-    routed = route(few)
-    columns = ["ticket_id", "customer_id", "status", "category", "true_category", "segment_name", "is_premium",
-               "queue", "priority", "sla_hours", "tokens", "transient_errors"]
-    results = routed[columns]
-    assert_no_pii(results)
-    results.to_csv(f"{OUTPUTS}/triage_results.csv", index=False)
-    print(md_table(results.groupby(["queue", "priority", "sla_hours"]).size().rename("tickets").reset_index()))
-    print(f"status counts: {results['status'].value_counts().to_dict()}")
-    print(f"premium tickets: {int(results['is_premium'].sum())}; "
-          f"tickets from customers with no segment: {int((results['segment_name'] == 'No completed orders').sum())}")
-
-    section("Token budget demonstration")
-    full_tokens = int(zero["tokens"].sum())
-    budget = 2000
-    demo = run_pipeline(tickets, ZERO_SHOT, token_budget=budget)
-    demo["budget"] = budget
-    demo_columns = ["ticket_id", "status", "category", "tokens", "cumulative_tokens", "budget"]
-    assert_no_pii(demo[demo_columns])
-    demo[demo_columns].to_csv(f"{OUTPUTS}/triage_budget_demo.csv", index=False)
-    spent = int(demo["tokens"].sum())
-    print(f"budget {budget} of {full_tokens} needed for a full run; spent {spent}; "
+    section(f"Task 7a: zero-shot run with TOKEN_BUDGET = {DEMO_TOKEN_BUDGET}")
+    demo, _ = run_pipeline(tickets, ZERO_SHOT, token_budget=DEMO_TOKEN_BUDGET)
+    demo_routed = route(demo)
+    demo_file = demo_routed[RESULT_COLUMNS + ["cumulative_tokens"]]
+    assert_no_pii(demo_file.to_csv(index=False), "triage_budget_demo.csv")
+    demo_file.to_csv(f"{OUTPUTS}/triage_budget_demo.csv", index=False)
+    exhausted = int((demo["status"] == "budget_exhausted").sum())
+    print(f"tokens spent {int(demo['tokens_used'].sum())}; budget_exhausted tickets {exhausted}; "
           f"status counts {demo['status'].value_counts().to_dict()}")
-    assert spent <= budget
+    assert exhausted >= 1
+
+    section(f"Task 7b: few-shot run with TOKEN_BUDGET = {FINAL_TOKEN_BUDGET}, routed")
+    final, _ = run_pipeline(tickets, FEW_SHOT, token_budget=FINAL_TOKEN_BUDGET)
+    results = route(final)[RESULT_COLUMNS]
+    assert_no_pii(results.to_csv(index=False), "triage_results.csv")
+    assert len(results) == 164
+    results.to_csv(f"{OUTPUTS}/triage_results.csv", index=False)
+    print(md_table(results.groupby(["route", "priority"]).size().rename("tickets").reset_index()))
+    print(f"status counts: {results['status'].value_counts().to_dict()}")
+    validated = int(results["status"].isin(CLASSIFIED).sum())
+    print(f"rule-validated answers: {validated}; sent to human review: {int((results['route'] == 'human_review').sum())}; "
+          f"customers with no segment row: {int((results['segment_name'] == '').sum())}")
 
     print("\nwritten: outputs/triage_results.csv, outputs/triage_budget_demo.csv")
 
